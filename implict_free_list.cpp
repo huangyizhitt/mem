@@ -14,9 +14,9 @@ bool TestAlign(uintptr_t addr, uintptr_t align)
 
 void IMPLICT_FREE_LIST_MEM_SYS::SetBlockSize(Block *block, uint64_t size)
 {
-    uint8_t *head = (uint8_t *)block;
-    uint64_t *block_head = (uint64_t *)head;
-    uint64_t *block_foot = (uint64_t *)(head + sizeof(uint64_t) + size);
+    Addr_t *head = (Addr_t *)block;
+    BlockMeta *block_head = (BlockMeta *)head;
+    BlockMeta *block_foot = (BlockMeta *)(head + sizeof(uint64_t) + size);
 
     uint64_t flag_size = 2 * sizeof(uint64_t);
     uint64_t old_size = (*block >> ALIGN_SHIFT);
@@ -28,8 +28,8 @@ void IMPLICT_FREE_LIST_MEM_SYS::SetBlockSize(Block *block, uint64_t size)
     if(old_size > flag_size && block_size < old_size - flag_size) {
         Block *next_block = (Block *)(head + block_size);
         uint64_t next_size = old_size - size - 2 * sizeof(uint64_t);
-        uint64_t *next_block_head = (uint64_t *)next_block;
-        uint64_t *next_block_foot = (uint64_t *)(head + old_size + sizeof(uint64_t));
+        BlockMeta *next_block_head = (uint64_t *)next_block;
+        BlockMeta *next_block_foot = (uint64_t *)(head + old_size + sizeof(uint64_t));
         *next_block_foot = *next_block_head = (next_size << ALIGN_SHIFT) & (~0x07);
     }
 }
@@ -37,7 +37,7 @@ void IMPLICT_FREE_LIST_MEM_SYS::SetBlockSize(Block *block, uint64_t size)
 Block* IMPLICT_FREE_LIST_MEM_SYS::GetFreeBlock(uint64_t size)
 {
     uint64_t inner_size = size + 16;
-    for(uint8_t *block_addr = heap; block_addr < heap+heap_size; ) {
+    for(Addr_t *block_addr = heap; block_addr < heap+heap_size; ) {
         Block *block = (Block *)block_addr;
         uint64_t flag = *block;
         uint64_t block_size = flag >> ALIGN_SHIFT;
@@ -56,8 +56,8 @@ Block *IMPLICT_FREE_LIST_MEM_SYS::GetNextBlock(Block *block)
     uint64_t flag = *block;
     uint64_t inner_size = (flag >> ALIGN_SHIFT) + 16;
 
-    uint8_t *addr = (uint8_t *)block;
-    uint8_t *next_block_addr = addr + inner_size;
+    Addr_t *addr = (Addr_t *)block;
+    Addr_t *next_block_addr = addr + inner_size;
     if(next_block_addr < heap + MEM_SIZE)
         return (Block *)next_block_addr;
     else
@@ -73,9 +73,9 @@ bool IMPLICT_FREE_LIST_MEM_SYS::GetNextBlockAllocFlag(Block *block)
 
 Block *IMPLICT_FREE_LIST_MEM_SYS::GetPrevBlock(Block *block)
 {
-    uint8_t *block_addr = (uint8_t *)block;
+    Addr_t *block_addr = (Addr_t *)block;
     if(block_addr == heap)   return nullptr;
-    uint64_t *prev_block_foot = block - 1;
+    BlockMeta *prev_block_foot = (BlockMeta *)block - 1;
     uint64_t inner_size = (*prev_block_foot >> ALIGN_SHIFT) + 2 * sizeof(uint64_t);
     return (Block *)(block_addr - inner_size);
 }
@@ -104,10 +104,10 @@ bool IMPLICT_FREE_LIST_MEM_SYS::CheckBlock(Block *block)
 
 void IMPLICT_FREE_LIST_MEM_SYS::SetBlockAlloc(Block *block)
 {
-    uint8_t *head = (uint8_t *)block;
+    Addr_t *head = (Addr_t *)block;
     uint64_t size = *block >> ALIGN_SHIFT;
-    uint64_t *block_head = (uint64_t *)head;
-    uint64_t *block_foot = (uint64_t *)(head + sizeof(uint64_t) + size);
+    BlockMeta *block_head = (BlockMeta *)head;
+    BlockMeta *block_foot = (BlockMeta *)(head + sizeof(uint64_t) + size);
 
     *block_head = *block_foot = (*block_head | 0x01); 
 }
@@ -115,7 +115,7 @@ void IMPLICT_FREE_LIST_MEM_SYS::SetBlockAlloc(Block *block)
 IMPLICT_FREE_LIST_MEM_SYS::IMPLICT_FREE_LIST_MEM_SYS()
 {
     heap_size = MEM_SIZE + 16;
-    uint8_t *head = new uint8_t[heap_size + ALIGN_SIZE];
+    Addr_t *head = new Addr_t[heap_size + ALIGN_SIZE];
 
     offset = ALIGN_SIZE - (uintptr_t)head % ALIGN_SIZE;
 
@@ -129,7 +129,7 @@ IMPLICT_FREE_LIST_MEM_SYS::IMPLICT_FREE_LIST_MEM_SYS()
 
 IMPLICT_FREE_LIST_MEM_SYS::~IMPLICT_FREE_LIST_MEM_SYS()
 {
-    uint8_t *head = heap - offset;
+    Addr_t *head = heap - offset;
 
     delete [] head;
 }
@@ -163,10 +163,10 @@ Block *IMPLICT_FREE_LIST_MEM_SYS::MergeBlock(Block *prev, Block *cur)
     uint64_t prev_size = *prev >> ALIGN_SHIFT;
     uint64_t cur_size = *cur >> ALIGN_SHIFT;
     uint64_t block_size = prev_size+cur_size+16;
-    uint8_t *cur_head_addr = (uint8_t *)cur;
+    Addr_t *cur_head_addr = (Addr_t *)cur;
 
-    uint64_t *block_head = (uint64_t *)prev;
-    uint64_t *block_foot = (uint64_t *)(cur_head_addr + cur_size + 8);
+    BlockMeta *block_head = (BlockMeta *)prev;
+    BlockMeta *block_foot = (BlockMeta *)(cur_head_addr + cur_size + 8);
     *block_foot = *block_head = (block_size << ALIGN_SHIFT);
 
     return prev;
@@ -175,7 +175,7 @@ Block *IMPLICT_FREE_LIST_MEM_SYS::MergeBlock(Block *prev, Block *cur)
 void IMPLICT_FREE_LIST_MEM_SYS::SetBlockFree(Block *block)
 {
     uint64_t flag = *block;
-    uint8_t *block_head = (uint8_t *)block;
+    Addr_t *block_head = (Addr_t *)block;
     uint64_t size = (flag >> ALIGN_SHIFT);
 
     Block *next_block = GetNextBlock(block);

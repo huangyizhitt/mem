@@ -4,6 +4,8 @@
 #include <cstdint>
 
 using Block = uint64_t;
+using BlockMeta = uint64_t;
+using Addr_t = uint8_t;
 
 const int ALIGN_SHIFT = 3;
 const uintptr_t ALIGN_SIZE = (1 << ALIGN_SHIFT);
@@ -34,7 +36,7 @@ private:
     }
 
 private:
-    uint8_t *heap;
+    Addr_t *heap;
     uintptr_t offset;
     uint64_t heap_size;
 };
