@@ -12,6 +12,16 @@ bool TestAlign(uintptr_t addr, uintptr_t align)
     return ((addr & (align - 1)) == 0);
 }
 
+void IMPLICT_FREE_LIST_MEM_SYS::TraverseList(Block *first_block, pFunc func, void *args)
+{
+    for(Addr_t *block_addr = (Addr_t *)first_block; block_addr < heap+heap_size; ) {
+        Block *block = (Block *)block_addr;
+        uint64_t block_size = *block >> ALIGN_SHIFT;
+        func(block, args);
+        block_addr += block_size + 2 * sizeof(uint64_t);
+    }
+}
+
 void IMPLICT_FREE_LIST_MEM_SYS::SetBlockSize(Block *block, uint64_t size)
 {
     Addr_t *head = (Addr_t *)block;
@@ -34,9 +44,10 @@ void IMPLICT_FREE_LIST_MEM_SYS::SetBlockSize(Block *block, uint64_t size)
     }
 }
 
-Block* IMPLICT_FREE_LIST_MEM_SYS::GetFreeBlock(uint64_t size)
+Block* IMPLICT_FREE_LIST_MEM_SYS::GetAllocatableBlock(uint64_t size)
 {
     uint64_t inner_size = size + 16;
+
     for(Addr_t *block_addr = heap; block_addr < heap+heap_size; ) {
         Block *block = (Block *)block_addr;
         uint64_t flag = *block;
@@ -93,11 +104,16 @@ bool IMPLICT_FREE_LIST_MEM_SYS::CheckBlock(Block *block)
     uint64_t flag = *block;
     uint64_t inner_size = (flag >> ALIGN_SHIFT) + 16;
     bool alloc_flag = flag & 0x01;
-    if(alloc_flag == true || (GetNextBlockAllocFlag(block) && GetPrevBlockAllocFlag(block))) {
-        printf("Block Right!\n");
+    bool prev_alloc_flag, next_alloc_flag;
+    if(alloc_flag == true || ( (next_alloc_flag = GetNextBlockAllocFlag(block)) 
+                && (prev_alloc_flag = GetPrevBlockAllocFlag(block)))) {
+        printf("This is a right block!\n");
         return true;
     } else {
-        printf("Block Fail!\n");
+        printf("This is a wrong block! Wrong status: ");
+        PrintAllocStatus(prev_alloc_flag);
+        PrintAllocStatus(alloc_flag);
+        PrintAllocStatus(next_alloc_flag);
         return false;
     }
 }
@@ -148,7 +164,7 @@ void *IMPLICT_FREE_LIST_MEM_SYS::Malloc(uint64_t size)
 {
     if(size > MEM_SIZE) return nullptr;
     size = ALIGN(size, ALIGN_SIZE);
-    Block *block = GetFreeBlock(size);
+    Block *block = GetAllocatableBlock(size);
     if(!block) return nullptr;
     SetBlockSize(block, size);
     SetBlockAlloc(block);

@@ -2,6 +2,7 @@
 #define _IMPLICT_FREE_LIST_H_
 
 #include <cstdint>
+#include <functional>
 
 using Block = uint64_t;
 using BlockMeta = uint64_t;
@@ -20,9 +21,11 @@ public:
     void CheckHeap();
 
 private:
+    using pFunc = std::function<void(Block *block, void *args)>;
     void SetBlockSize(Block *block, uint64_t size);
     void SetBlockAlloc(Block *block);
-    Block *GetFreeBlock(uint64_t size);
+    void TraverseList(Block *first_block, pFunc func, void *args);
+    Block *GetAllocatableBlock(uint64_t size);
     bool CheckBlock(Block *block);
     Block *GetNextBlock(Block *block);
     bool GetNextBlockAllocFlag(Block *block);
@@ -33,6 +36,14 @@ private:
     inline bool CheckBlockAlloc(Block *block) {
         if(!block) return true;
         return (*block & 0x01);
+    }
+
+    inline void PrintAllocStatus(bool flag) {
+        if(flag) {
+            printf("A");
+        } else {
+            printf("F");
+        }
     }
 
 private:
