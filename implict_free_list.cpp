@@ -2,6 +2,11 @@
 #include <cstdio>
 #include <cstdlib>
 
+#define __ALIGN_KERNEL(x, a)        __ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
+#define __ALIGN_KERNEL_MASK(x, mask)    (((x) + (mask)) & ~(mask))
+
+#define ALIGN(x, a)     __ALIGN_KERNEL((x), (a))
+
 bool TestAlign(uintptr_t addr, uintptr_t align)
 {
     return ((addr & (align - 1)) == 0);
@@ -22,17 +27,17 @@ void IMPLICT_FREE_LIST_MEM_SYS::SetBlockSize(Block *block, uint64_t size)
     
     if(old_size > flag_size && block_size < old_size - flag_size) {
         Block *next_block = (Block *)(head + block_size);
-        uint64_t next_size = old_size - block_size - 2 * sizeof(uint64_t);
+        uint64_t next_size = old_size - size - 2 * sizeof(uint64_t);
         uint64_t *next_block_head = (uint64_t *)next_block;
         uint64_t *next_block_foot = (uint64_t *)(head + old_size + sizeof(uint64_t));
-        *next_block_foot = *next_block_head = (next_size << ALIGN_SHIFT) & 0xF8;
+        *next_block_foot = *next_block_head = (next_size << ALIGN_SHIFT) & (~0x07);
     }
 }
 
 Block* IMPLICT_FREE_LIST_MEM_SYS::GetFreeBlock(uint64_t size)
 {
     uint64_t inner_size = size + 16;
-    for(uint8_t *block_addr = heap; block_addr < heap+heap_size; block_addr += inner_size) {
+    for(uint8_t *block_addr = heap; block_addr < heap+heap_size; ) {
         Block *block = (Block *)block_addr;
         uint64_t flag = *block;
         uint64_t block_size = flag >> ALIGN_SHIFT;
@@ -40,6 +45,7 @@ Block* IMPLICT_FREE_LIST_MEM_SYS::GetFreeBlock(uint64_t size)
         if(size <= block_size && alloc_flag == 0) {
             return block;
         }
+        block_addr += block_size + 2 * sizeof(uint64_t);
     }
 
     return nullptr;
@@ -67,10 +73,10 @@ bool IMPLICT_FREE_LIST_MEM_SYS::GetNextBlockAllocFlag(Block *block)
 
 Block *IMPLICT_FREE_LIST_MEM_SYS::GetPrevBlock(Block *block)
 {
-    uint8_t *block_addr = (uint8_t *)heap;
+    uint8_t *block_addr = (uint8_t *)block;
     if(block_addr == heap)   return nullptr;
     uint64_t *prev_block_foot = block - 1;
-    uint64_t inner_size = *prev_block_foot >> ALIGN_SHIFT;
+    uint64_t inner_size = (*prev_block_foot >> ALIGN_SHIFT) + 2 * sizeof(uint64_t);
     return (Block *)(block_addr - inner_size);
 }
 
@@ -109,9 +115,9 @@ void IMPLICT_FREE_LIST_MEM_SYS::SetBlockAlloc(Block *block)
 IMPLICT_FREE_LIST_MEM_SYS::IMPLICT_FREE_LIST_MEM_SYS()
 {
     heap_size = MEM_SIZE + 16;
-    uint8_t *head = new uint8_t[heap_size + ALIGN];
+    uint8_t *head = new uint8_t[heap_size + ALIGN_SIZE];
 
-    offset = ALIGN - (uintptr_t)head % ALIGN;
+    offset = ALIGN_SIZE - (uintptr_t)head % ALIGN_SIZE;
 
     heap = head + offset;
 
@@ -132,8 +138,8 @@ void IMPLICT_FREE_LIST_MEM_SYS::CheckHeap()
 {
     uintptr_t heap_addr = (uintptr_t)heap;
     
-    if(!TestAlign(heap_addr, ALIGN)) {
-        printf("Heap alloc error at %p, can't align: %lu\n", heap, ALIGN);
+    if(!TestAlign(heap_addr, ALIGN_SIZE)) {
+        printf("Heap alloc error at %p, can't align: %lu\n", heap, ALIGN_SIZE);
         exit(1);
     }
 }
@@ -141,12 +147,14 @@ void IMPLICT_FREE_LIST_MEM_SYS::CheckHeap()
 void *IMPLICT_FREE_LIST_MEM_SYS::Malloc(uint64_t size)
 {
     if(size > MEM_SIZE) return nullptr;
+    size = ALIGN(size, ALIGN_SIZE);
     Block *block = GetFreeBlock(size);
     if(!block) return nullptr;
     SetBlockSize(block, size);
     SetBlockAlloc(block);
 
     void *vaddr = (void *)(block + 1);
+    printf("Malloc block: %p, vaddr: %p\n", block, vaddr);
     return vaddr;
 }
 
@@ -158,7 +166,7 @@ Block *IMPLICT_FREE_LIST_MEM_SYS::MergeBlock(Block *prev, Block *cur)
     uint8_t *cur_head_addr = (uint8_t *)cur;
 
     uint64_t *block_head = (uint64_t *)prev;
-    uint64_t *block_foot = cur + cur_size + 8;
+    uint64_t *block_foot = (uint64_t *)(cur_head_addr + cur_size + 8);
     *block_foot = *block_head = (block_size << ALIGN_SHIFT);
 
     return prev;
@@ -173,17 +181,17 @@ void IMPLICT_FREE_LIST_MEM_SYS::SetBlockFree(Block *block)
     Block *next_block = GetNextBlock(block);
     Block *prev_block = GetPrevBlock(block);
 
-    if(!CheckBlockAlloc(next_block) && !CheckBlockAlloc(prev_block)) {
+    if(CheckBlockAlloc(next_block) && CheckBlockAlloc(prev_block)) {
         *block  = (flag & (~0x07));
         CheckBlock(block);
         return ;
     }
 
-    if(next_block && !CheckBlockAlloc(next_block)) {
+    if(!CheckBlockAlloc(next_block)) {
         MergeBlock(block, next_block);
     }
 
-    if(prev_block && !CheckBlockAlloc(prev_block)) {
+    if(!CheckBlockAlloc(prev_block)) {
         prev_block = MergeBlock(prev_block, block);
     }
 
@@ -193,7 +201,6 @@ void IMPLICT_FREE_LIST_MEM_SYS::SetBlockFree(Block *block)
 void IMPLICT_FREE_LIST_MEM_SYS::Free(void *vaddr)
 {
     Block *block = (Block *)vaddr - 1;
-    uint64_t flag = *block;
-    uint64_t size = (flag >> ALIGN_SHIFT);
+    printf("Will free block: %p\n", block);
     SetBlockFree(block);
 }

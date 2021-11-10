@@ -6,7 +6,7 @@
 using Block = uint64_t;
 
 const int ALIGN_SHIFT = 3;
-const uintptr_t ALIGN = (1 << ALIGN_SHIFT);
+const uintptr_t ALIGN_SIZE = (1 << ALIGN_SHIFT);
 const int MEM_SIZE = 32 * 1024 * 1024;
 
 class IMPLICT_FREE_LIST_MEM_SYS {
@@ -29,7 +29,7 @@ private:
     void SetBlockFree(Block *block);
     Block *MergeBlock(Block *prev, Block *cur);
     inline bool CheckBlockAlloc(Block *block) {
-        if(!block) return false;
+        if(!block) return true;
         return (*block & 0x01);
     }
 
