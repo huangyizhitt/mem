@@ -2,16 +2,6 @@
 #include <cstdio>
 #include <cstdlib>
 
-#define __ALIGN_KERNEL(x, a)        __ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
-#define __ALIGN_KERNEL_MASK(x, mask)    (((x) + (mask)) & ~(mask))
-
-#define ALIGN(x, a)     __ALIGN_KERNEL((x), (a))
-
-bool TestAlign(uintptr_t addr, uintptr_t align)
-{
-    return ((addr & (align - 1)) == 0);
-}
-
 void IMPLICT_FREE_LIST_MEM_SYS::TraverseList(Block *first_block, pFunc func, void *args)
 {
     for(Addr_t *block_addr = (Addr_t *)first_block; block_addr < heap+heap_size; ) {

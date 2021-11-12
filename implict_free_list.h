@@ -1,16 +1,12 @@
 #ifndef _IMPLICT_FREE_LIST_H_
 #define _IMPLICT_FREE_LIST_H_
 
-#include <cstdint>
 #include <functional>
+#include "utils.h"
 
 using Block = uint64_t;
 using BlockMeta = uint64_t;
 using Addr_t = uint8_t;
-
-const int ALIGN_SHIFT = 3;
-const uintptr_t ALIGN_SIZE = (1 << ALIGN_SHIFT);
-const int MEM_SIZE = 32 * 1024 * 1024;
 
 class IMPLICT_FREE_LIST_MEM_SYS {
 public:
