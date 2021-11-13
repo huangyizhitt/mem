@@ -2,7 +2,7 @@
 #define _EXPLICT_LIST_H_
 
 #include "utils.h"
-#include <cstdlib>
+
 
 enum class InsertType {
     Middle_Insert,
@@ -18,11 +18,13 @@ public:
 
     FreeBlock(const FreeBlock& other) : next(nullptr), prev(nullptr), 
         start(other.start), size(other.size) {}
+
+    uintptr_t Alloc(size_t size);
  
     FreeBlock *next;
     FreeBlock *prev;
     uintptr_t start;
-    size_t size;
+    size_t size;                            //block_size = payload_size + head_size;
 };
 
 class FreeList {
@@ -40,9 +42,10 @@ public:
 
     void PushBack(const FreeBlock& block);
     void Insert(FreeBlock *block);
+    FreeBlock *FindFitBlock(size_t size);
 
 private:
-    FreeBlock *FindFit(const FreeBlock *block, InsertType& type);
+    FreeBlock *FindInsertPos(const FreeBlock *block, InsertType& type);
     void InsertBack(FreeBlock *prev, FreeBlock *block);
     void MergeForward(FreeBlock *prev_block, FreeBlock *next_block);
     void MergeBackward(FreeBlock *prev_block, FreeBlock *next_block);
@@ -63,7 +66,8 @@ public:
 
 private:
     FreeList list;
-    void *heap;
+    uint8_t *heap;
+    uintptr_t offset;
     size_t heap_size;
 };
 
