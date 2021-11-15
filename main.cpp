@@ -1,4 +1,3 @@
-//#include "implict_free_list.h"
 #include "interface.h"
 #include <vector>
 
@@ -10,6 +9,7 @@ int main(int argc, char **argv)
     std::vector<int> alloc_sizes(alloc_size, alloc_size + sizeof(alloc_size)/sizeof(int));
     std::vector<int *> ptrs;
     ptrs.resize(alloc_sizes.size());
+
     InitMemSys(Implement::Explicit_Free_List);
 
     for(int i = 0; i < ptrs.size(); i++) {

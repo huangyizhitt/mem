@@ -1,22 +1,14 @@
 #include "interface.h"
-#include "memory_system.h"
-#include "implict_free_list.h"
-#include "explict_free_list.h"
+#include "mem_factory.h"
 
 static MEM_SYS *mem_sys;
+static MemsysFactory *mem_sys_factory;
 
-void InitMemSys(Implement impl)
+static void SelectFactory(Implement impl)
 {
     switch(impl) {
         case Implement::Explicit_Free_List:
-            mem_sys = new EXPLICT_FREE_LIST_MEM_SYS;
-            break;
-
-        case Implement::Implicit_Free_List:
-            
-            break;
-
-        case Implement::RB_Tree:
+            mem_sys_factory = new ExplictFreeListFactory;
             break;
 
         default:
@@ -24,9 +16,16 @@ void InitMemSys(Implement impl)
     }
 }
 
+void InitMemSys(Implement impl)
+{
+    SelectFactory(impl);
+    mem_sys = mem_sys_factory->CreateMemsys();
+}
+
 void DeInitMemSys()
 {
     delete mem_sys;
+    delete mem_sys_factory;
 }
 
 void *Malloc(size_t size)
