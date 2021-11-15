@@ -1,5 +1,5 @@
 #include "explict_free_list.h"
-int a;
+
 uintptr_t FreeBlock::Alloc(size_t size)
 {
     uintptr_t addr = this->start + head_size;
