@@ -2,7 +2,7 @@
 #define _EXPLICT_LIST_H_
 
 #include "utils.h"
-
+#include "memory_system.h"
 
 enum class InsertType {
     Middle_Insert,
@@ -57,18 +57,16 @@ private:
     uint64_t free_blocks;
 };
 
-class EXPLICT_FREE_LIST_MEM_SYS {
+class EXPLICT_FREE_LIST_MEM_SYS : public MEM_SYS {
 public:
     EXPLICT_FREE_LIST_MEM_SYS();
-    ~EXPLICT_FREE_LIST_MEM_SYS();
-    void *Malloc(size_t size);
-    void Free(void *ptr);
+    virtual ~EXPLICT_FREE_LIST_MEM_SYS();
+    virtual void *Malloc(size_t size);
+    virtual void Free(void *ptr);
+    virtual void Expand(size_t asize);
 
 private:
     FreeList list;
-    uint8_t *heap;
-    uintptr_t offset;
-    size_t heap_size;
 };
 
 #endif

@@ -129,26 +129,30 @@ FreeBlock *FreeList::FindFitBlock(size_t size)
         if(b->size >= size) 
             return b;
     }
+
+    return nullptr;
 }
 
 EXPLICT_FREE_LIST_MEM_SYS::EXPLICT_FREE_LIST_MEM_SYS()
 {
-    heap_size = MEM_SIZE + head_size;
-    uint8_t *head = new uint8_t[heap_size + ALIGN_SIZE];
-
-    offset = ALIGN_SIZE - (uintptr_t)head % ALIGN_SIZE;
-
-    heap = head + offset;
-
-    uintptr_t start = (uintptr_t)heap;
+    Heap heap = MEM_SYS::GetHeaps()[0];
+    uintptr_t start = (uintptr_t)heap.heap;
     SetSize((Flag_t *)start, MEM_SIZE);
-    list.Insert(new FreeBlock(start, heap_size));
+    list.Insert(new FreeBlock(start, heap.heap_size));
 }
 
 EXPLICT_FREE_LIST_MEM_SYS::~EXPLICT_FREE_LIST_MEM_SYS()
 {
-    uint8_t *head = heap - offset;
-    delete [] head;
+    
+}
+
+void EXPLICT_FREE_LIST_MEM_SYS::Expand(size_t asize)
+{
+    MEM_SYS::Expand(asize);
+    Heap heap = MEM_SYS::GetHeaps().back();
+    uintptr_t start = (uintptr_t)heap.heap;
+    SetSize((Flag_t *)start, MEM_SIZE);
+    list.Insert(new FreeBlock(start, heap.heap_size));
 }
 
 void* EXPLICT_FREE_LIST_MEM_SYS::Malloc(size_t size)
@@ -158,6 +162,12 @@ void* EXPLICT_FREE_LIST_MEM_SYS::Malloc(size_t size)
     size_t asize = ALIGN(size, ALIGN_SIZE);
 
     FreeBlock *block = list.FindFitBlock(asize);
+
+    // Can not find fit block, expand
+    if(!block) {
+        Expand(asize);
+        block = list.FindFitBlock(asize);
+    }
 
     uintptr_t vaddr = block->Alloc(asize);
 
