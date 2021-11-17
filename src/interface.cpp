@@ -11,6 +11,10 @@ static void SelectFactory(Implement impl)
             mem_sys_factory = new ExplictFreeListFactory;
             break;
 
+        case Implement::Implicit_Free_List:
+            mem_sys_factory = new ImplictFreeListFactory;
+            break;
+
         default:
             break;
     }
@@ -30,10 +34,16 @@ void DeInitMemSys()
 
 void *Malloc(size_t size)
 {
-    mem_sys->Malloc(size);
+    if(size == 0) return nullptr;
+    size_t asize = ALIGN(size, ALIGN_SIZE);
+
+    void *ptr = mem_sys->Malloc(asize);
+    debugp("Malloc success! Address: %p, size: %lu\n", ptr, asize);
+    return ptr;
 }
 
 void Free(void *ptr)
 {
     mem_sys->Free(ptr);
+    debugp("Free address: %p success!\n", ptr);
 }

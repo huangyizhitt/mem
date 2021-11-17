@@ -17,7 +17,13 @@ static_lib = $(LIB_DIR)/libmem.a
 target_share_lib = mem_test_share_lib
 target_static_lib = mem_test_static_lib
 
-CXX_FLAGS = -O3 -std=gnu++11 -I$(INC_DIR)
+CXX_FLAGS = -std=gnu++11 -I$(INC_DIR)
+ifeq ($(debug), 1)
+	CXX_FLAGS += -g -DDEBUG
+else
+	CXX_FLAGS += -O3
+endif
+
 SHARED_FLAGS = -fPIC -shared
 
 all: $(OBJ_DIR) $(LIB_DIR) $(target_share_lib) $(target_static_lib)

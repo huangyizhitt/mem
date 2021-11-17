@@ -13,7 +13,6 @@ uintptr_t FreeBlock::Alloc(size_t size)
 
 FreeList::~FreeList()
 {
-//    printf("free blocks: %d\n", free_blocks);
     FreeBlock *block = front, *next_block;
     do {
         next_block = block->next;
@@ -146,32 +145,28 @@ EXPLICT_FREE_LIST_MEM_SYS::~EXPLICT_FREE_LIST_MEM_SYS()
     
 }
 
-void EXPLICT_FREE_LIST_MEM_SYS::Expand(size_t asize)
+size_t EXPLICT_FREE_LIST_MEM_SYS::Expand(size_t asize)
 {
     MEM_SYS::Expand(asize);
     Heap heap = MEM_SYS::GetHeaps().back();
     uintptr_t start = (uintptr_t)heap.heap;
-    SetSize((Flag_t *)start, MEM_SIZE);
+    SetSize((Flag_t *)start, heap.heap_size);
     list.Insert(new FreeBlock(start, heap.heap_size));
+
+    return heap.heap_size;
 }
 
 void* EXPLICT_FREE_LIST_MEM_SYS::Malloc(size_t size)
 {
-    if(size == 0) return nullptr;
-
-    size_t asize = ALIGN(size, ALIGN_SIZE);
-
-    FreeBlock *block = list.FindFitBlock(asize);
+    FreeBlock *block = list.FindFitBlock(size);
 
     // Can not find fit block, expand
     if(!block) {
-        Expand(asize);
-        block = list.FindFitBlock(asize);
+        Expand(size);
+        block = list.FindFitBlock(size);
     }
 
-    uintptr_t vaddr = block->Alloc(asize);
-
-    printf("Malloc success: vaddr: 0x%lx, size: %ld\n", vaddr, asize);
+    uintptr_t vaddr = block->Alloc(size);
 
     return (void *)vaddr;
 }
@@ -186,6 +181,4 @@ void EXPLICT_FREE_LIST_MEM_SYS::Free(void *ptr)
     FreeBlock *block = new FreeBlock(start, block_size);
 
     list.Insert(block);
-
-    printf("Free success: vaddr: %p, block_size: %ld\n", ptr, block_size);
 }

@@ -2,211 +2,140 @@
 #include <cstdio>
 #include <cstdlib>
 
-void IMPLICT_FREE_LIST_MEM_SYS::TraverseList(Block *first_block, pFunc func, void *args)
+void IMPLICT_FREE_LIST_MEM_SYS::SetBlockFlag(Block block, size_t size, bool alloc)
 {
-    for(Addr_t *block_addr = (Addr_t *)first_block; block_addr < heap+heap_size; ) {
-        Block *block = (Block *)block_addr;
-        uint64_t block_size = *block >> ALIGN_SHIFT;
-        func(block, args);
-        block_addr += block_size + 2 * sizeof(uint64_t);
-    }
+    uintptr_t head_addr = (uintptr_t)block;
+    uintptr_t foot_addr = head_addr + size + head_size;
+    Flag_t *head_flag = (Flag_t *)head_addr;
+    Flag_t *foot_flag = (Flag_t *)foot_addr;
+
+    bool is_heap_head = isHeapHead(head_flag);
+    *head_flag = (size << ALIGN_SHIFT) | (is_heap_head << HEAP_HEAD_SHFIT) | (alloc & 0x1);
+
+    bool is_heap_foot = isHeapFoot(foot_flag);
+    *foot_flag = (size << ALIGN_SHIFT) | (is_heap_foot << HEAP_FOOT_SHFIT) | (alloc & 0x1);
 }
 
-void IMPLICT_FREE_LIST_MEM_SYS::SetBlockSize(Block *block, uint64_t size)
+void IMPLICT_FREE_LIST_MEM_SYS::InitHeap(const Heap& heap, const size_t& heap_size)
 {
-    Addr_t *head = (Addr_t *)block;
-    BlockMeta *block_head = (BlockMeta *)head;
-    BlockMeta *block_foot = (BlockMeta *)(head + sizeof(uint64_t) + size);
-
-    uint64_t flag_size = 2 * sizeof(uint64_t);
-    uint64_t old_size = (*block >> ALIGN_SHIFT);
-    uint64_t block_size = size + flag_size;
-    uint64_t value = (size << ALIGN_SHIFT);
-    *block_head = value;
-    *block_foot = value;
-    
-    if(old_size > flag_size && block_size < old_size - flag_size) {
-        Block *next_block = (Block *)(head + block_size);
-        uint64_t next_size = old_size - size - 2 * sizeof(uint64_t);
-        BlockMeta *next_block_head = (uint64_t *)next_block;
-        BlockMeta *next_block_foot = (uint64_t *)(head + old_size + sizeof(uint64_t));
-        *next_block_foot = *next_block_head = (next_size << ALIGN_SHIFT) & (~0x07);
-    }
-}
-
-Block* IMPLICT_FREE_LIST_MEM_SYS::GetAllocatableBlock(uint64_t size)
-{
-    uint64_t inner_size = size + 16;
-
-    for(Addr_t *block_addr = heap; block_addr < heap+heap_size; ) {
-        Block *block = (Block *)block_addr;
-        uint64_t flag = *block;
-        uint64_t block_size = flag >> ALIGN_SHIFT;
-        bool alloc_flag = flag & 0x01;
-        if(size <= block_size && alloc_flag == 0) {
-            return block;
-        }
-        block_addr += block_size + 2 * sizeof(uint64_t);
-    }
-
-    return nullptr;
-}
-
-Block *IMPLICT_FREE_LIST_MEM_SYS::GetNextBlock(Block *block)
-{
-    uint64_t flag = *block;
-    uint64_t inner_size = (flag >> ALIGN_SHIFT) + 16;
-
-    Addr_t *addr = (Addr_t *)block;
-    Addr_t *next_block_addr = addr + inner_size;
-    if(next_block_addr < heap + MEM_SIZE)
-        return (Block *)next_block_addr;
-    else
-        return nullptr;  
-}
-
-bool IMPLICT_FREE_LIST_MEM_SYS::GetNextBlockAllocFlag(Block *block)
-{
-    Block *next_block = GetNextBlock(block);
-    if(!next_block) return true;
-    return (*next_block & 0x01);
-}
-
-Block *IMPLICT_FREE_LIST_MEM_SYS::GetPrevBlock(Block *block)
-{
-    Addr_t *block_addr = (Addr_t *)block;
-    if(block_addr == heap)   return nullptr;
-    BlockMeta *prev_block_foot = (BlockMeta *)block - 1;
-    uint64_t inner_size = (*prev_block_foot >> ALIGN_SHIFT) + 2 * sizeof(uint64_t);
-    return (Block *)(block_addr - inner_size);
-}
-
-bool IMPLICT_FREE_LIST_MEM_SYS::GetPrevBlockAllocFlag(Block *block)
-{
-    Block *prev_block = GetPrevBlock(block);
-    if(!prev_block) return true;
-    return (*prev_block & 0x01);
-}
-
-bool IMPLICT_FREE_LIST_MEM_SYS::CheckBlock(Block *block)
-{
-    if(!block) return false;
-    uint64_t flag = *block;
-    uint64_t inner_size = (flag >> ALIGN_SHIFT) + 16;
-    bool alloc_flag = flag & 0x01;
-    bool prev_alloc_flag, next_alloc_flag;
-    if(alloc_flag == true || ( (next_alloc_flag = GetNextBlockAllocFlag(block)) 
-                && (prev_alloc_flag = GetPrevBlockAllocFlag(block)))) {
-        printf("This is a right block!\n");
-        return true;
-    } else {
-        printf("This is a wrong block! Wrong status: ");
-        PrintAllocStatus(prev_alloc_flag);
-        PrintAllocStatus(alloc_flag);
-        PrintAllocStatus(next_alloc_flag);
-        return false;
-    }
-}
-
-void IMPLICT_FREE_LIST_MEM_SYS::SetBlockAlloc(Block *block)
-{
-    Addr_t *head = (Addr_t *)block;
-    uint64_t size = *block >> ALIGN_SHIFT;
-    BlockMeta *block_head = (BlockMeta *)head;
-    BlockMeta *block_foot = (BlockMeta *)(head + sizeof(uint64_t) + size);
-
-    *block_head = *block_foot = (*block_head | 0x01); 
+    uintptr_t heap_head_addr = (uintptr_t)heap.heap;
+    uintptr_t heap_foot_addr = heap_head_addr + heap_size + head_size;
+    SetFlag((Flag_t *)heap_head_addr, heap_size, false);
+    SetFlag((Flag_t *)heap_foot_addr, heap_size, false);
+    SetHeapFlag((Flag_t *)heap_head_addr, (Flag_t *)heap_foot_addr);
 }
 
 IMPLICT_FREE_LIST_MEM_SYS::IMPLICT_FREE_LIST_MEM_SYS()
 {
-    heap_size = MEM_SIZE + 16;
-    Addr_t *head = new Addr_t[heap_size + ALIGN_SIZE];
-
-    offset = ALIGN_SIZE - (uintptr_t)head % ALIGN_SIZE;
-
-    heap = head + offset;
-
-    Block *first_block = (Block *)heap;
-
-    SetBlockSize(first_block, MEM_SIZE);
-    SetBlockFree(first_block);
+    Heap heap = MEM_SYS::GetHeaps()[0];
+    InitHeap(heap, MEM_SIZE);
 }
 
-IMPLICT_FREE_LIST_MEM_SYS::~IMPLICT_FREE_LIST_MEM_SYS()
+Block IMPLICT_FREE_LIST_MEM_SYS::FindFit(size_t size)
 {
-    Addr_t *head = heap - offset;
+    std::vector<Heap> heaps = MEM_SYS::GetHeaps();
+    for(int i = 0; i < heaps.size(); i++) {
+        uintptr_t start = (uintptr_t)heaps[i].heap;
+        uintptr_t end = start + heaps[i].heap_size + head_size + foot_size;
+        while(start < end) {
+            size_t payload_size = GetSize((Flag_t *)start);
+            size_t block_size = payload_size + head_size + foot_size;
+            if(size <= payload_size && !isAlloc((Flag_t *)start))    return (Block)start;
+            start += block_size;
+        }
+    }
 
-    delete [] head;
+    return NoneBlock;
 }
 
-void IMPLICT_FREE_LIST_MEM_SYS::CheckHeap()
+size_t IMPLICT_FREE_LIST_MEM_SYS::Expand(size_t size)
 {
-    uintptr_t heap_addr = (uintptr_t)heap;
+    size = MEM_SYS::Expand(size);
+
+    Heap heap = MEM_SYS::GetHeaps().back();
+    InitHeap(heap, size);
+    return size;
+}
+
+void *IMPLICT_FREE_LIST_MEM_SYS::AllocBlock(Block block, size_t size)
+{
+    // alloc address
+    uintptr_t head_addr = (uintptr_t)block;
+    void *ptr = (void *)(head_addr + head_size);
+
+    //split block
+    size_t old_size = GetSize((Flag_t *)head_addr);
+    size_t block_size = size + head_size + foot_size;
+
+    if(old_size >= block_size) {
+        //need splite block;
+        SetBlockFlag(block, size, true);
+
+        Block next_block = block + block_size;
+        size_t next_block_size = old_size - block_size;
+        SetBlockFlag(next_block, next_block_size, false);
+    } else {
+        //use the whole block, only set allocated bit to 1
+        SetBlockAllocated(block);
+    }
+
+    return ptr;
+}
+
+void* IMPLICT_FREE_LIST_MEM_SYS::Malloc(size_t size)
+{
+    Block fit_block = FindFit(size);
+
+    if(fit_block == NoneBlock) {
+        Expand(size);
+        fit_block = FindFit(size);
+    }
+
+    return AllocBlock(fit_block, size);
+}
+
+Block IMPLICT_FREE_LIST_MEM_SYS::MergeBlock(Block block, Block next_block)
+{
+    uintptr_t head_addr = (uintptr_t)block;
+    size_t block_size = GetSize((Flag_t *)head_addr) + head_size + foot_size;
+    size_t next_block_size = GetSize((Flag_t *)next_block) + head_size + foot_size;
+    uintptr_t foot_addr = head_addr + block_size + next_block_size - foot_size;
+
+    size_t size = block_size + next_block_size - foot_size - head_size;
+
+    SetBlockFlag(block, size, false);
+
+    return block;
+}
+
+void IMPLICT_FREE_LIST_MEM_SYS::Free(void *ptr)
+{
+    Block block = (Block)((uintptr_t)ptr - head_size);
+
+    uintptr_t head_addr = (uintptr_t)block;
+    size_t block_size = GetSize((Flag_t *)head_addr) + head_size + foot_size;
+    uintptr_t foot_addr = head_addr+block_size-foot_size;
+
+    if(isHeapHead((Flag_t *)head_addr) && isHeapFoot((Flag_t *)foot_addr)) {
+        // the block is heap, set allocated bit to 0
+        SetBlockFree((Flag_t *)head_addr, (Flag_t *)foot_addr);
+        return;
+    } 
     
-    if(!TestAlign(heap_addr, ALIGN_SIZE)) {
-        printf("Heap alloc error at %p, can't align: %lu\n", heap, ALIGN_SIZE);
-        exit(1);
-    }
-}
-
-void *IMPLICT_FREE_LIST_MEM_SYS::Malloc(uint64_t size)
-{
-    if(size > MEM_SIZE) return nullptr;
-    size = ALIGN(size, ALIGN_SIZE);
-    Block *block = GetAllocatableBlock(size);
-    if(!block) return nullptr;
-    SetBlockSize(block, size);
-    SetBlockAlloc(block);
-
-    void *vaddr = (void *)(block + 1);
-    printf("Malloc block: %p, vaddr: %p\n", block, vaddr);
-    return vaddr;
-}
-
-Block *IMPLICT_FREE_LIST_MEM_SYS::MergeBlock(Block *prev, Block *cur)
-{
-    uint64_t prev_size = *prev >> ALIGN_SHIFT;
-    uint64_t cur_size = *cur >> ALIGN_SHIFT;
-    uint64_t block_size = prev_size+cur_size+16;
-    Addr_t *cur_head_addr = (Addr_t *)cur;
-
-    BlockMeta *block_head = (BlockMeta *)prev;
-    BlockMeta *block_foot = (BlockMeta *)(cur_head_addr + cur_size + 8);
-    *block_foot = *block_head = (block_size << ALIGN_SHIFT);
-
-    return prev;
-}
-
-void IMPLICT_FREE_LIST_MEM_SYS::SetBlockFree(Block *block)
-{
-    uint64_t flag = *block;
-    Addr_t *block_head = (Addr_t *)block;
-    uint64_t size = (flag >> ALIGN_SHIFT);
-
-    Block *next_block = GetNextBlock(block);
-    Block *prev_block = GetPrevBlock(block);
-
-    if(CheckBlockAlloc(next_block) && CheckBlockAlloc(prev_block)) {
-        *block  = (flag & (~0x07));
-        CheckBlock(block);
-        return ;
+    Block next_block = block + block_size;
+    if(!isHeapFoot((Flag_t *)foot_addr) && !isAlloc((Flag_t *)next_block)){
+        // If the block is not the last block of the heap, and the next block is free
+        // The block and next_block can be merged
+        block = MergeBlock(block, next_block);
     }
 
-    if(!CheckBlockAlloc(next_block)) {
-        MergeBlock(block, next_block);
+    if(!isHeapHead((Flag_t *)head_addr)) {
+        uintptr_t prev_foot_addr = head_addr - foot_size;
+        size_t prev_block_size = GetSize((Flag_t *)prev_foot_addr) + head_size + foot_size;
+        Block prev_block = block - prev_block_size;
+
+        if(!isAlloc((Flag_t *)prev_block)) {
+            block = MergeBlock(prev_block, block);
+        }
     }
-
-    if(!CheckBlockAlloc(prev_block)) {
-        prev_block = MergeBlock(prev_block, block);
-    }
-
-    CheckBlock(prev_block);
-}
-
-void IMPLICT_FREE_LIST_MEM_SYS::Free(void *vaddr)
-{
-    Block *block = (Block *)vaddr - 1;
-    printf("Will free block: %p\n", block);
-    SetBlockFree(block);
 }

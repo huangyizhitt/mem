@@ -13,4 +13,9 @@ public:
     virtual MEM_SYS *CreateMemsys();
 };
 
+class ImplictFreeListFactory : public MemsysFactory {
+public:
+    virtual MEM_SYS *CreateMemsys();
+};
+
 #endif
