@@ -4,7 +4,7 @@
 void MEM_SYS::AllocHeap(Heap& heap, size_t size)
 {
     heap.heap_size = size + head_size;
-    uint8_t *head = new uint8_t[heap.heap_size + ALIGN_SIZE];
+    uint8_t *head = new uint8_t[heap.heap_size + ALIGN_SIZE]();
 
     heap.offset = ALIGN_SIZE - (uintptr_t)head % ALIGN_SIZE;
 
@@ -13,7 +13,7 @@ void MEM_SYS::AllocHeap(Heap& heap, size_t size)
     heaps.emplace_back(heap);
 }
 
-void MEM_SYS::Expand(size_t asize)
+size_t MEM_SYS::Expand(size_t asize)
 {
     Heap heap;
     size_t expand_size;
@@ -23,7 +23,8 @@ void MEM_SYS::Expand(size_t asize)
         expand_size = asize << 1;
     }
     AllocHeap(heap, expand_size);
-    printf("Expand, expand size: %lu\n", expand_size);
+    debugp("Expand, expand size: %lu\n", expand_size);
+    return expand_size;
 }
 
 MEM_SYS::MEM_SYS()
@@ -39,5 +40,5 @@ MEM_SYS::~MEM_SYS()
         delete [] head;
     } 
 
-    printf("Call destructor of MEM_SYS\n");
+    debugp("Call destructor of MEM_SYS\n");
 }

@@ -63,7 +63,7 @@ public:
     virtual ~EXPLICT_FREE_LIST_MEM_SYS();
     virtual void *Malloc(size_t size);
     virtual void Free(void *ptr);
-    virtual void Expand(size_t asize);
+    virtual size_t Expand(size_t asize);
 
 private:
     FreeList list;

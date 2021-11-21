@@ -6,3 +6,8 @@ MEM_SYS *ExplictFreeListFactory::CreateMemsys()
 {
     return new EXPLICT_FREE_LIST_MEM_SYS;
 }
+
+MEM_SYS *ImplictFreeListFactory::CreateMemsys()
+{
+    return new IMPLICT_FREE_LIST_MEM_SYS;
+}

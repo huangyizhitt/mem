@@ -18,7 +18,7 @@ public:
 
     virtual void *Malloc(size_t size) = 0;
     virtual void Free(void *ptr) = 0;
-    virtual void Expand(size_t asize);
+    virtual size_t Expand(size_t asize);
 
 private:
     void AllocHeap(Heap& heap, size_t size);
